@@ -250,10 +250,11 @@ class GameRunner:
             return 0  # Don't calculate points until game is over
         
         points = 0
-        
-        # Calculate points based on placed tiles
+        print("\n--- Final Tile Scoring Breakdown ---")
         for tile in save_state.placed_tiles:
-            points += self._calculate_tile_points(tile, save_state)
+            tile_points = self._calculate_tile_points(tile, save_state)
+            print(f"Tile {tile.choice.tile_type} at {tile.tile_position}: {tile_points} points")
+            points += tile_points
         
         # Calculate penalty for features in wrong locations (sea vs island)
         points -= self._calculate_location_penalties(save_state)
@@ -388,24 +389,26 @@ class GameRunner:
     
     def _calculate_church_points(self, position: Tuple[int, int], save_state: SaveState) -> int:
         """Churches like houses on same island but not another church (2pts per nearby house, 1pt per additional house on island, 0 if another church on island)"""
-        # Check if another church is on the same island
         if self._has_another_church_on_island(position, save_state):
             return 0
-        
+
         points = 0
-        nearby = self._get_nearby_positions(position)
-        houses_on_island = 0
-        
-        for pos in nearby:
+        nearby_houses = set()
+        all_houses_on_island = set()
+
+        # 1. Add 2 points for each nearby house
+        for pos in self._get_nearby_positions(position):
             tile = self._get_tile_at_position(pos, save_state)
             if tile and tile.choice.tile_type == "houses":
-                points += 2  # 2pts for each nearby house
-                if self._is_on_same_island(position, pos, save_state):
-                    houses_on_island += 1
-        
-        # Add 1pt for each additional house on the same island
-        points += houses_on_island
-        
+                points += 2
+                nearby_houses.add(pos)
+
+        # 2. Add 1 point for each house on the same island (excluding already counted nearby houses)
+        for tile in save_state.placed_tiles:
+            if tile.choice.tile_type == "houses" and self._is_on_same_island(position, tile.tile_position, save_state):
+                if tile.tile_position not in nearby_houses:
+                    points += 1
+
         return points
     
     def _calculate_forest_points(self, position: Tuple[int, int], save_state: SaveState) -> int:

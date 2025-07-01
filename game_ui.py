@@ -554,27 +554,27 @@ class GameUI:
                     vertex_pos = self.get_vertex_pos_from_mouse(event.pos)
                     if vertex_pos:
                         # Check if we can add this vertex
-                        if len(self.border_drag_path) > 0:
-                            last_vertex = self.border_drag_path[-1]
-                            # Only allow horizontal or vertical moves
-                            if (vertex_pos[0] == last_vertex[0] or vertex_pos[1] == last_vertex[1]) and \
-                               (abs(vertex_pos[0] - last_vertex[0]) <= 1 and abs(vertex_pos[1] - last_vertex[1]) <= 1):
-                                
-                                # Check if we're revisiting a vertex (for closing or undoing)
-                                if vertex_pos in self.border_drag_path:
-                                    # Find the index of the revisited vertex
-                                    revisit_index = self.border_drag_path.index(vertex_pos)
+                        if len(self.current_border_lines) + len(self.border_drag_path) < MAX_BORDER_LINES:
+                            if len(self.border_drag_path) > 0:
+                                last_vertex = self.border_drag_path[-1]
+                                # Only allow horizontal or vertical moves
+                                if (vertex_pos[0] == last_vertex[0] or vertex_pos[1] == last_vertex[1]) and \
+                                   (abs(vertex_pos[0] - last_vertex[0]) <= 1 and abs(vertex_pos[1] - last_vertex[1]) <= 1):
                                     
-                                    # If we're revisiting the start vertex, close the border
-                                    if revisit_index == 0 and len(self.border_drag_path) > 3:
-                                        self.border_drag_path.append(vertex_pos)
-                                        self.handle_border_release()
-                                    # Otherwise, undo back to that vertex
+                                    # Check if we're revisiting a vertex (for closing or undoing)
+                                    if vertex_pos in self.border_drag_path:
+                                        # Find the index of the revisited vertex
+                                        revisit_index = self.border_drag_path.index(vertex_pos)
+                                        
+                                        # If we're revisiting the start vertex, close the border
+                                        if revisit_index == 0 and len(self.border_drag_path) > 3:
+                                            self.border_drag_path.append(vertex_pos)
+                                            self.handle_border_release()
+                                        # Otherwise, undo back to that vertex
+                                        else:
+                                            self.border_drag_path = self.border_drag_path[:revisit_index + 1]
                                     else:
-                                        self.border_drag_path = self.border_drag_path[:revisit_index + 1]
-                                else:
-                                    # Add new vertex if we haven't reached the limit
-                                    if len(self.save_state.border_lines) + len(self.current_border_lines) + len(self.border_drag_path) < MAX_BORDER_LINES:
+                                        # Add new vertex if we haven't reached the limit
                                         self.border_drag_path.append(vertex_pos)
                         else:
                             self.border_drag_path.append(vertex_pos)
@@ -645,7 +645,7 @@ class GameUI:
         if self.is_valid_border_path(self.border_drag_path) and self.is_enclosed_path(self.border_drag_path):
             border_lines = self.create_border_lines_from_path(self.border_drag_path)
             
-            if len(self.save_state.border_lines) + len(self.current_border_lines) + len(border_lines) <= MAX_BORDER_LINES:
+            if len(self.current_border_lines) + len(self.border_drag_path) <= MAX_BORDER_LINES:
                 self.current_border_lines.extend(border_lines)
                 print("Border created successfully!")
                 

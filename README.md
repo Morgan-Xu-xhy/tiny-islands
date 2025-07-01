@@ -139,6 +139,7 @@ pip install pygame
 python game_ui.py
 ```
 
+
 ### Game Controls
 - **Mouse**: Click to select choices and place tiles
 - **Border Drawing**: Click and drag on grid vertices to draw borders
