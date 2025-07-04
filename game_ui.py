@@ -77,6 +77,8 @@ class GameUI:
         self.font_large = pygame.font.Font(None, 48)
         self.font_medium = pygame.font.Font(None, 32)
         self.font_small = pygame.font.Font(None, 24)
+        
+        self.colored_island_tiles = set()  # Stores all tiles that have ever been part of an island
     
     def load_tile_icons(self):
         """Load and resize tile icons"""
@@ -117,9 +119,9 @@ class GameUI:
         x, y = mouse_pos
         if (GRID_OFFSET_X <= x < GRID_OFFSET_X + GRID_SIZE * GRID_CELL_SIZE and
             GRID_OFFSET_Y <= y < GRID_OFFSET_Y + GRID_SIZE * GRID_CELL_SIZE):
-            row = (y - GRID_OFFSET_Y) // GRID_CELL_SIZE
-            col = (x - GRID_OFFSET_X) // GRID_CELL_SIZE
-            return (row, col)
+            grid_x = (x - GRID_OFFSET_X) // GRID_CELL_SIZE  # Column
+            grid_y = (y - GRID_OFFSET_Y) // GRID_CELL_SIZE  # Row
+            return (grid_x, grid_y)  # Return (x, y) where x is column, y is row
         return None
     
     def get_vertex_pos_from_mouse(self, mouse_pos: Tuple[int, int]) -> Optional[Tuple[int, int]]:
@@ -128,14 +130,14 @@ class GameUI:
         if (GRID_OFFSET_X <= x < GRID_OFFSET_X + (GRID_SIZE + 1) * GRID_CELL_SIZE and
             GRID_OFFSET_Y <= y < GRID_OFFSET_Y + (GRID_SIZE + 1) * GRID_CELL_SIZE):
             # Calculate which vertex the mouse is closest to
-            vertex_row = round((y - GRID_OFFSET_Y) / GRID_CELL_SIZE)
-            vertex_col = round((x - GRID_OFFSET_X) / GRID_CELL_SIZE)
+            vertex_x = round((x - GRID_OFFSET_X) / GRID_CELL_SIZE)  # Column
+            vertex_y = round((y - GRID_OFFSET_Y) / GRID_CELL_SIZE)  # Row
             
             # Clamp to valid range
-            vertex_row = max(0, min(GRID_SIZE, vertex_row))
-            vertex_col = max(0, min(GRID_SIZE, vertex_col))
+            vertex_x = max(0, min(GRID_SIZE, vertex_x))
+            vertex_y = max(0, min(GRID_SIZE, vertex_y))
             
-            return (vertex_row, vertex_col)
+            return (vertex_x, vertex_y)  # Return (x, y) where x is column, y is row
         return None
     
     def is_border_turn(self) -> bool:
@@ -151,23 +153,23 @@ class GameUI:
         
         if chunk_type == "cluster":
             # 3x3 clusters, numbered 1-9 from top-left to bottom-right
-            cluster_row = ((chunk_position - 1) // 3) * 3
-            cluster_col = ((chunk_position - 1) % 3) * 3
-            for row in range(cluster_row, cluster_row + 3):
-                for col in range(cluster_col, cluster_col + 3):
-                    positions.append((row, col))
+            cluster_y = ((chunk_position - 1) // 3) * 3  # Row
+            cluster_x = ((chunk_position - 1) % 3) * 3   # Column
+            for y in range(cluster_y, cluster_y + 3):
+                for x in range(cluster_x, cluster_x + 3):
+                    positions.append((x, y))  # (x, y) where x is column, y is row
         
         elif chunk_type == "horizontal":
             # Horizontal rows, numbered 1-9 from top to bottom
-            row = chunk_position - 1
-            for col in range(GRID_SIZE):
-                positions.append((row, col))
+            y = chunk_position - 1  # Row
+            for x in range(GRID_SIZE):  # Columns
+                positions.append((x, y))
         
         elif chunk_type == "vertical":
             # Vertical columns, numbered 1-9 from left to right
-            col = chunk_position - 1
-            for row in range(GRID_SIZE):
-                positions.append((row, col))
+            x = chunk_position - 1  # Column
+            for y in range(GRID_SIZE):  # Rows
+                positions.append((x, y))
         
         return positions
     
@@ -267,96 +269,107 @@ class GameUI:
     
     def draw_grid(self):
         """Draw the main game grid"""
+        # Draw permanent island backgrounds with the new color #c9c6af
+        ISLAND_PERMA_COLOR = (201, 198, 175)  # #c9c6af in RGB
+        for (x, y) in self.colored_island_tiles:  # x is column, y is row
+            screen_x = GRID_OFFSET_X + x * GRID_CELL_SIZE
+            screen_y = GRID_OFFSET_Y + y * GRID_CELL_SIZE
+            pygame.draw.rect(self.screen, ISLAND_PERMA_COLOR, (screen_x, screen_y, GRID_CELL_SIZE, GRID_CELL_SIZE))
+        
         # Draw grid cells
-        for row in range(GRID_SIZE):
-            for col in range(GRID_SIZE):
-                x = GRID_OFFSET_X + col * GRID_CELL_SIZE
-                y = GRID_OFFSET_Y + row * GRID_CELL_SIZE
+        for y in range(GRID_SIZE):  # Rows
+            for x in range(GRID_SIZE):  # Columns
+                screen_x = GRID_OFFSET_X + x * GRID_CELL_SIZE
+                screen_y = GRID_OFFSET_Y + y * GRID_CELL_SIZE
                 
-                # Determine cell color
+                # Determine cell color (only for non-island tiles)
                 color = WHITE
-                tile = self.get_tile_at_position((row, col))
+                tile = self.get_tile_at_position((x, y))  # (x, y) where x is column, y is row
                 
-                if tile:
-                    color = LIGHT_BLUE
-                elif self.selected_choice:
-                    valid_positions = self.get_chunk_positions(self.selected_choice)
-                    if (row, col) in valid_positions:
-                        if self.hover_choice:
-                            color = YELLOW  # Hover highlight
-                        else:
-                            color = LIGHT_GREEN  # Valid position
-                elif self.hover_choice:
-                    # Show chunk preview for hovered choice
-                    hover_positions = self.get_chunk_positions(self.hover_choice)
-                    if (row, col) in hover_positions:
-                        color = YELLOW  # Hover preview
+                # Only apply cell background color if this tile is not part of an island
+                if (x, y) not in self.colored_island_tiles:
+                    if tile:
+                        color = LIGHT_BLUE
+                    elif self.selected_choice:
+                        valid_positions = self.get_chunk_positions(self.selected_choice)
+                        if (x, y) in valid_positions:
+                            if self.hover_choice:
+                                color = YELLOW  # Hover highlight
+                            else:
+                                color = LIGHT_GREEN  # Valid position
+                    elif self.hover_choice:
+                        # Show chunk preview for hovered choice
+                        hover_positions = self.get_chunk_positions(self.hover_choice)
+                        if (x, y) in hover_positions:
+                            color = YELLOW  # Hover preview
+                    
+                    # Draw cell background only for non-island tiles
+                    pygame.draw.rect(self.screen, color, (screen_x, screen_y, GRID_CELL_SIZE, GRID_CELL_SIZE))
                 
-                # Draw cell background
-                pygame.draw.rect(self.screen, color, (x, y, GRID_CELL_SIZE, GRID_CELL_SIZE))
-                pygame.draw.rect(self.screen, BLACK, (x, y, GRID_CELL_SIZE, GRID_CELL_SIZE), 1)
+                # Draw cell border for all tiles
+                pygame.draw.rect(self.screen, BLACK, (screen_x, screen_y, GRID_CELL_SIZE, GRID_CELL_SIZE), 1)
                 
                 # Draw tile if present
                 if tile:
                     icon = self.tile_icons.get(tile.choice.tile_type)
                     if icon:
-                        self.screen.blit(icon, (x, y))
+                        self.screen.blit(icon, (screen_x, screen_y))
                     else:
                         text = self.font_small.render(tile.choice.tile_type[:3].upper(), True, BLACK)
-                        text_rect = text.get_rect(center=(x + GRID_CELL_SIZE//2, y + GRID_CELL_SIZE//2))
+                        text_rect = text.get_rect(center=(screen_x + GRID_CELL_SIZE//2, screen_y + GRID_CELL_SIZE//2))
                         self.screen.blit(text, text_rect)
                 
                 # Draw tile preview
-                elif (self.hover_position == (row, col) and self.selected_choice):
+                elif (self.hover_position == (x, y) and self.selected_choice):
                     icon = self.tile_icons.get(self.selected_choice.tile_type)
                     if icon:
                         # Create semi-transparent preview
                         preview_surface = icon.copy()
                         preview_surface.set_alpha(128)  # 50% transparency
-                        self.screen.blit(preview_surface, (x, y))
+                        self.screen.blit(preview_surface, (screen_x, screen_y))
                     else:
                         text = self.font_small.render(self.selected_choice.tile_type[:3].upper(), True, BLACK)
-                        text_rect = text.get_rect(center=(x + GRID_CELL_SIZE//2, y + GRID_CELL_SIZE//2))
+                        text_rect = text.get_rect(center=(screen_x + GRID_CELL_SIZE//2, screen_y + GRID_CELL_SIZE//2))
                         self.screen.blit(text, text_rect)
         
         # Draw border nodes (vertices) if in border turn
         if self.is_border_turn():
             for node in self.border_nodes:
-                row, col = node
-                x = GRID_OFFSET_X + col * GRID_CELL_SIZE
-                y = GRID_OFFSET_Y + row * GRID_CELL_SIZE
+                x, y = node  # x is column, y is row
+                screen_x = GRID_OFFSET_X + x * GRID_CELL_SIZE
+                screen_y = GRID_OFFSET_Y + y * GRID_CELL_SIZE
                 
                 # Check if this vertex is in the current path
                 if node in self.border_drag_path:
                     # Highlight vertices in the current path
-                    pygame.draw.circle(self.screen, ORANGE, (x, y), 6)
+                    pygame.draw.circle(self.screen, ORANGE, (screen_x, screen_y), 6)
                 else:
                     # Regular vertex nodes
-                    pygame.draw.circle(self.screen, BLACK, (x, y), 3)
+                    pygame.draw.circle(self.screen, BLACK, (screen_x, screen_y), 3)
         
         # Draw existing border lines
         for border_line in self.save_state.border_lines:
-            start_row, start_col = border_line.start_pos
-            end_row, end_col = border_line.end_pos
+            start_x, start_y = border_line.start_pos  # x is column, y is row
+            end_x, end_y = border_line.end_pos
             
-            start_x = GRID_OFFSET_X + start_col * GRID_CELL_SIZE
-            start_y = GRID_OFFSET_Y + start_row * GRID_CELL_SIZE
-            end_x = GRID_OFFSET_X + end_col * GRID_CELL_SIZE
-            end_y = GRID_OFFSET_Y + end_row * GRID_CELL_SIZE
+            start_screen_x = GRID_OFFSET_X + start_x * GRID_CELL_SIZE
+            start_screen_y = GRID_OFFSET_Y + start_y * GRID_CELL_SIZE
+            end_screen_x = GRID_OFFSET_X + end_x * GRID_CELL_SIZE
+            end_screen_y = GRID_OFFSET_Y + end_y * GRID_CELL_SIZE
             
-            pygame.draw.line(self.screen, DARK_GREEN, (start_x, start_y), (end_x, end_y), 3)
+            pygame.draw.line(self.screen, DARK_GREEN, (start_screen_x, start_screen_y), (end_screen_x, end_screen_y), 3)
         
         # Draw current border lines being drawn
         for border_line in self.current_border_lines:
-            start_row, start_col = border_line.start_pos
-            end_row, end_col = border_line.end_pos
+            start_x, start_y = border_line.start_pos  # x is column, y is row
+            end_x, end_y = border_line.end_pos
             
-            start_x = GRID_OFFSET_X + start_col * GRID_CELL_SIZE
-            start_y = GRID_OFFSET_Y + start_row * GRID_CELL_SIZE
-            end_x = GRID_OFFSET_X + end_col * GRID_CELL_SIZE
-            end_y = GRID_OFFSET_Y + end_row * GRID_CELL_SIZE
+            start_screen_x = GRID_OFFSET_X + start_x * GRID_CELL_SIZE
+            start_screen_y = GRID_OFFSET_Y + start_y * GRID_CELL_SIZE
+            end_screen_x = GRID_OFFSET_X + end_x * GRID_CELL_SIZE
+            end_screen_y = GRID_OFFSET_Y + end_y * GRID_CELL_SIZE
             
-            pygame.draw.line(self.screen, DARK_GREEN, (start_x, start_y), (end_x, end_y), 3)
+            pygame.draw.line(self.screen, DARK_GREEN, (start_screen_x, start_screen_y), (end_screen_x, end_screen_y), 3)
         
         # Draw border preview
         if self.border_drag_active and len(self.border_drag_path) > 1:
@@ -364,15 +377,15 @@ class GameUI:
                 start_node = self.border_drag_path[i]
                 end_node = self.border_drag_path[i + 1]
                 
-                start_row, start_col = start_node
-                end_row, end_col = end_node
+                start_x, start_y = start_node  # x is column, y is row
+                end_x, end_y = end_node
                 
-                start_x = GRID_OFFSET_X + start_col * GRID_CELL_SIZE
-                start_y = GRID_OFFSET_Y + start_row * GRID_CELL_SIZE
-                end_x = GRID_OFFSET_X + end_col * GRID_CELL_SIZE
-                end_y = GRID_OFFSET_Y + end_row * GRID_CELL_SIZE
+                start_screen_x = GRID_OFFSET_X + start_x * GRID_CELL_SIZE
+                start_screen_y = GRID_OFFSET_Y + start_y * GRID_CELL_SIZE
+                end_screen_x = GRID_OFFSET_X + end_x * GRID_CELL_SIZE
+                end_screen_y = GRID_OFFSET_Y + end_y * GRID_CELL_SIZE
                 
-                pygame.draw.line(self.screen, ORANGE, (start_x, start_y), (end_x, end_y), 3)
+                pygame.draw.line(self.screen, ORANGE, (start_screen_x, start_screen_y), (end_screen_x, end_screen_y), 3)
     
     def draw_choice_panel(self):
         """Draw the choice panel on the right"""
@@ -463,13 +476,13 @@ class GameUI:
         cell_size = preview_size // GRID_SIZE
         
         # Draw preview grid
-        for row in range(GRID_SIZE):
-            for col in range(GRID_SIZE):
-                cell_x = x + col * cell_size
-                cell_y = y + row * cell_size
+        for y_pos in range(GRID_SIZE):  # Rows
+            for x_pos in range(GRID_SIZE):  # Columns
+                cell_x = x + x_pos * cell_size
+                cell_y = y + y_pos * cell_size
                 
                 chunk_positions = self.get_chunk_positions(choice)
-                if (row, col) in chunk_positions:
+                if (x_pos, y_pos) in chunk_positions:  # (x, y) where x is column, y is row
                     color = LIGHT_GREEN
                 else:
                     color = WHITE
@@ -508,7 +521,15 @@ class GameUI:
             self.screen.blit(points_text, (30, 95))
         
         # Border info
-        border_info = f"Border lines: {summary['border_lines_drawn']}/{MAX_BORDER_LINES}"
+        if self.is_border_turn():
+            # Count lines: placed + in-progress drag
+            in_progress = 0
+            if self.border_drag_active and len(self.border_drag_path) > 1:
+                in_progress = len(self.border_drag_path) - 1
+            border_lines_drawn = len(self.current_border_lines) + in_progress
+            border_info = f"Border lines: {border_lines_drawn}/{MAX_BORDER_LINES}"
+        else:
+            border_info = f"Border lines: 0/{MAX_BORDER_LINES}"
         border_text = self.font_small.render(border_info, True, BLACK)
         self.screen.blit(border_text, (30, 120))
         
@@ -553,19 +574,20 @@ class GameUI:
                 if self.border_drag_active:
                     vertex_pos = self.get_vertex_pos_from_mouse(event.pos)
                     if vertex_pos:
-                        # Check if we can add this vertex
-                        if len(self.current_border_lines) + len(self.border_drag_path) < MAX_BORDER_LINES:
+                        # Calculate how many lines would be drawn if we add this vertex
+                        in_progress = len(self.border_drag_path) - 1 if len(self.border_drag_path) > 0 else 0
+                        total_lines = len(self.current_border_lines) + in_progress
+                        # Only allow adding if we don't exceed the limit
+                        if total_lines < MAX_BORDER_LINES:
                             if len(self.border_drag_path) > 0:
                                 last_vertex = self.border_drag_path[-1]
                                 # Only allow horizontal or vertical moves
                                 if (vertex_pos[0] == last_vertex[0] or vertex_pos[1] == last_vertex[1]) and \
                                    (abs(vertex_pos[0] - last_vertex[0]) <= 1 and abs(vertex_pos[1] - last_vertex[1]) <= 1):
-                                    
                                     # Check if we're revisiting a vertex (for closing or undoing)
                                     if vertex_pos in self.border_drag_path:
                                         # Find the index of the revisited vertex
                                         revisit_index = self.border_drag_path.index(vertex_pos)
-                                        
                                         # If we're revisiting the start vertex, close the border
                                         if revisit_index == 0 and len(self.border_drag_path) > 3:
                                             self.border_drag_path.append(vertex_pos)
@@ -577,7 +599,10 @@ class GameUI:
                                         # Add new vertex if we haven't reached the limit
                                         self.border_drag_path.append(vertex_pos)
                         else:
-                            self.border_drag_path.append(vertex_pos)
+                            # Exceeded the limit: stop the drag and reset
+                            print("Border limit reached! Drag cancelled.")
+                            self.border_drag_active = False
+                            self.border_drag_path = []
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
@@ -658,6 +683,37 @@ class GameUI:
         
         self.border_drag_path = []
     
+    def border_lines_to_tile_positions(self, border_lines: List[BorderLine]) -> List[Tuple[int, int]]:
+        """Convert border lines to enclosed tile positions using ray casting"""
+        if not border_lines:
+            return []
+        
+        # Build a list of line segments
+        segments = []
+        for line in border_lines:
+            segments.append((line.start_pos, line.end_pos))
+        
+        enclosed_tiles = []
+        for y in range(GRID_SIZE):  # Rows
+            for x in range(GRID_SIZE):  # Columns
+                # Cast a vertical ray upward from the center of the tile
+                ray_x = x + 0.5
+                ray_y = y + 0.5
+                crossings = 0
+                for (start, end) in segments:
+                    (x1, y1), (x2, y2) = start, end  # Already in (x, y) format
+                    # Only consider segments that cross the ray vertically
+                    if min(y1, y2) < ray_y <= max(y1, y2):
+                        # Compute the x coordinate where the segment crosses ray_y
+                        if y2 != y1:
+                            x_cross = x1 + (x2 - x1) * (ray_y - y1) / (y2 - y1)
+                            if x_cross > ray_x:
+                                crossings += 1
+                if crossings % 2 == 1:
+                    enclosed_tiles.append((x, y))  # (x, y) where x is column, y is row
+        
+        return enclosed_tiles
+
     def complete_border_turn(self):
         """Complete the border drawing turn"""
         if not self.is_border_turn():
@@ -667,27 +723,52 @@ class GameUI:
             # Create dummy choices for border turn
             dummy_choice1 = Choice("houses", "cluster", 1)
             dummy_choice2 = Choice("ships", "cluster", 2)
-            
             print(f"Completing border turn. Current turn: {self.save_state.current_turn}")
             print(f"Border lines to add: {len(self.current_border_lines)}")
+            print(f"Border lines sent: {[str(line) for line in self.current_border_lines]}")
+            
+            # Convert border lines to tile positions
+            border_tiles = self.border_lines_to_tile_positions(self.current_border_lines)
+            print(f"Converted to {len(border_tiles)} border tiles: {border_tiles}")
+            
+            prev_island_positions = set()
+            if hasattr(self, 'save_state') and hasattr(self.save_state, 'islands'):
+                for island in self.save_state.islands:
+                    prev_island_positions.update(island.enclosed_positions)
             
             self.save_state = self.game_runner.make_turn(
                 self.save_state,
                 dummy_choice1,
                 dummy_choice2,
                 (0, 0),  # Dummy position
-                self.current_border_lines
+                border_tiles  # Send tile positions instead of border lines
             )
+            
+            # Find new island positions (those not present before this border turn)
+            new_island_positions = set()
+            for island in self.save_state.islands:
+                new_island_positions.update(island.enclosed_positions)
+            just_created = new_island_positions - prev_island_positions
+            print(f"prev_island_positions: {prev_island_positions}")
+            print(f"new_island_positions: {new_island_positions}")
+            print(f"just_created: {just_created}")
+            self.colored_island_tiles.update(just_created)
             
             # Reset border drawing state
             self.current_border_lines = []
             self.clear_current_choices()
             print(f"Border turn completed! New turn: {self.save_state.current_turn}")
-            
         except Exception as e:
             print(f"Error completing border turn: {e}")
             import traceback
             traceback.print_exc()
+    
+    def get_island_tile_positions(self) -> set:
+        """Return a set of all (x, y) positions that are enclosed by border lines (i.e., on any island)."""
+        island_positions = set()
+        for island in self.save_state.islands:
+            island_positions.update(island.enclosed_positions)
+        return island_positions
     
     def run(self):
         """Main game loop"""

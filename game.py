@@ -490,78 +490,7 @@ class GameRunner:
         
         return False
     
-    def _detect_islands(self, border_lines: List[BorderLine]) -> List[Island]:
-        """Detect islands and lakes from border lines"""
-        if not border_lines:
-            return []
-        
-        # Create a grid representation of the border lines
-        grid = [[False for _ in range(self.grid_size + 1)] for _ in range(self.grid_size + 1)]
-        
-        # Mark border lines on the grid
-        for line in border_lines:
-            start_row, start_col = line.start_pos
-            end_row, end_col = line.end_pos
-            
-            if line.is_horizontal:
-                # Horizontal line
-                for col in range(min(start_col, end_col), max(start_col, end_col) + 1):
-                    grid[start_row][col] = True
-            else:
-                # Vertical line
-                for row in range(min(start_row, end_row), max(start_row, end_row) + 1):
-                    grid[row][start_col] = True
-        
-        # Find enclosed areas using flood-fill
-        islands = []
-        visited = set()
-        
-        for row in range(self.grid_size + 1):
-            for col in range(self.grid_size + 1):
-                if (row, col) not in visited and not grid[row][col]:
-                    # Found an unvisited non-border position
-                    enclosed_positions = set()
-                    self._flood_fill(row, col, grid, visited, enclosed_positions)
-                    
-                    if enclosed_positions:
-                        # Convert enclosed positions to tile positions
-                        tile_positions = set()
-                        for pos in enclosed_positions:
-                            # Convert vertex positions to tile positions
-                            if pos[0] < self.grid_size and pos[1] < self.grid_size:
-                                tile_positions.add(pos)
-                        
-                        if tile_positions:
-                            # Determine if this is a lake (enclosed within existing islands)
-                            is_lake = self._is_lake(tile_positions)
-                            island = Island(
-                                border_lines=border_lines,
-                                enclosed_positions=tile_positions,
-                                is_lake=is_lake
-                            )
-                            islands.append(island)
-        
-        return islands
-    
-    def _flood_fill(self, row: int, col: int, grid: List[List[bool]], 
-                   visited: Set[Tuple[int, int]], enclosed_positions: Set[Tuple[int, int]]):
-        """Flood fill to find enclosed areas"""
-        if (row < 0 or row >= len(grid) or col < 0 or col >= len(grid[0]) or
-            (row, col) in visited or grid[row][col]):
-            return
-        
-        visited.add((row, col))
-        enclosed_positions.add((row, col))
-        
-        # Recursively fill adjacent positions
-        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            self._flood_fill(row + dr, col + dc, grid, visited, enclosed_positions)
-    
-    def _is_lake(self, tile_positions: Set[Tuple[int, int]]) -> bool:
-        """Determine if an enclosed area is a lake (within an existing island)"""
-        # For now, we'll consider it a lake if it's a small enclosed area
-        # In a full implementation, you'd check if it's completely surrounded by existing islands
-        return len(tile_positions) < 10  # Arbitrary threshold for now
+
     
     def generate_choice(self) -> List[Choice]:
         """Generate exactly 2 random choices for the current turn"""
@@ -585,9 +514,153 @@ class GameRunner:
         
         return choices
     
+    def _validate_border_tiles(self, tile_positions: List[Tuple[int, int]]) -> bool:
+        """Validate that a set of tile positions forms a valid enclosed area"""
+        if not tile_positions:
+            return False
+        
+        # Check that all tiles are neighbors (connected)
+        if not self._are_tiles_connected(tile_positions):
+            return False
+        
+        # Check that the area is properly enclosed
+        if not self._is_area_enclosed(tile_positions):
+            return False
+        
+        # Check that the border length is <= 24 units
+        border_length = self._calculate_border_length(tile_positions)
+        if border_length > MAX_BORDER_LINES:
+            return False
+        
+        return True
+    
+    def _are_tiles_connected(self, tile_positions: List[Tuple[int, int]]) -> bool:
+        """Check if all tiles are connected (neighbors)"""
+        if len(tile_positions) <= 1:
+            return True
+        
+        # Use BFS to check connectivity
+        visited = set()
+        queue = [tile_positions[0]]
+        visited.add(tile_positions[0])
+        
+        while queue:
+            current = queue.pop(0)
+            # Check all 4 adjacent positions
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                neighbor = (current[0] + dx, current[1] + dy)
+                if neighbor in tile_positions and neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+        
+        return len(visited) == len(tile_positions)
+    
+    def _calculate_border_length(self, tile_positions: List[Tuple[int, int]]) -> int:
+        """Calculate the length of the border around the tile positions"""
+        if not tile_positions:
+            return 0
+        
+        tile_set = set(tile_positions)
+        border_edges = set()  # Use set to avoid counting edges twice
+        
+        for pos in tile_positions:
+            x, y = pos  # x is column, y is row
+            # Check each of the 4 sides of this tile
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                neighbor = (x + dx, y + dy)
+                # If neighbor is not in our tile set, this is a border edge
+                if neighbor not in tile_set:
+                    # Create a unique identifier for this edge to avoid double counting
+                    # Use a consistent representation for each edge
+                    if dx == 0:  # Vertical edge
+                        edge = tuple(sorted([(x, y), (x, y + 1)])) if dy < 0 else tuple(sorted([(x, y + 1), (x, y)]))
+                    else:  # Horizontal edge
+                        edge = tuple(sorted([(x, y), (x + 1, y)])) if dx < 0 else tuple(sorted([(x + 1, y), (x, y)]))
+                    border_edges.add(edge)
+        
+        return len(border_edges)
+    
+    def _is_area_enclosed(self, tile_positions: List[Tuple[int, int]]) -> bool:
+        """Check if the area is properly enclosed (no holes, forms a single connected region)"""
+        if len(tile_positions) <= 1:
+            return True
+        
+        # Create a set for fast lookup
+        tile_set = set(tile_positions)
+        
+        # Find the bounding box
+        min_x = min(pos[0] for pos in tile_positions)  # x is column
+        max_x = max(pos[0] for pos in tile_positions)
+        min_y = min(pos[1] for pos in tile_positions)  # y is row
+        max_y = max(pos[1] for pos in tile_positions)
+        
+        # Check that all tiles within the bounding box are either in the set or outside
+        # This ensures no holes in the middle
+        for x in range(min_x, max_x + 1):
+            for y in range(min_y, max_y + 1):
+                pos = (x, y)
+                if pos not in tile_set:
+                    # This position is not in our tile set
+                    # Check if it's completely surrounded by our tiles (indicating a hole)
+                    if self._is_position_surrounded(pos, tile_set):
+                        return False
+        
+        return True
+    
+    def _is_position_surrounded(self, pos: Tuple[int, int], tile_set: set) -> bool:
+        """Check if a position is completely surrounded by tiles in the set"""
+        x, y = pos  # x is column, y is row
+        # Check all 4 adjacent positions
+        adjacent_count = 0
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            neighbor = (x + dx, y + dy)
+            if neighbor in tile_set:
+                adjacent_count += 1
+        
+        # If it's surrounded by 4 tiles, it's a hole
+        return adjacent_count == 4
+    
+    def _tiles_to_border_lines(self, tile_positions: List[Tuple[int, int]]) -> List[BorderLine]:
+        """Convert tile positions to border lines for storage"""
+        if not tile_positions:
+            return []
+        
+        tile_set = set(tile_positions)
+        border_lines = []
+        
+        for pos in tile_positions:
+            x, y = pos  # x is column, y is row
+            # Check each of the 4 sides of this tile
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                neighbor = (x + dx, y + dy)
+                # If neighbor is not in our tile set, this is a border edge
+                if neighbor not in tile_set:
+                    # Create a border line for this edge
+                    if dx == 0:  # Vertical edge
+                        # Vertical line between this tile and neighbor
+                        start_pos = (x, y) if dy < 0 else (x, y + 1)
+                        end_pos = (x + 1, y) if dy < 0 else (x + 1, y + 1)
+                        border_line = BorderLine(start_pos, end_pos, False)
+                    else:  # Horizontal edge
+                        # Horizontal line between this tile and neighbor
+                        start_pos = (x, y) if dx < 0 else (x + 1, y)
+                        end_pos = (x, y + 1) if dx < 0 else (x + 1, y + 1)
+                        border_line = BorderLine(start_pos, end_pos, True)
+                    
+                    # Only add if we haven't already added this line (avoid duplicates)
+                    if not any(self._lines_equal(border_line, existing) for existing in border_lines):
+                        border_lines.append(border_line)
+        
+        return border_lines
+    
+    def _lines_equal(self, line1: BorderLine, line2: BorderLine) -> bool:
+        """Check if two border lines are equal (same edge)"""
+        return ((line1.start_pos == line2.start_pos and line1.end_pos == line2.end_pos) or
+                (line1.start_pos == line2.end_pos and line1.end_pos == line2.start_pos))
+
     def make_turn(self, save_state: SaveState, chosen_choice: Choice, 
                   discarded_choice: Choice, tile_position: Tuple[int, int],
-                  border_lines: Optional[List[BorderLine]] = None) -> SaveState:
+                  border_tiles: Optional[List[Tuple[int, int]]] = None) -> SaveState:
         """Make a turn and return the updated save state"""
         if self.decide_end(save_state):
             raise ValueError("Cannot make turn: game has ended")
@@ -598,28 +671,60 @@ class GameRunner:
         # Create turn history
         chosen_tile = PlacedTile(chosen_choice, tile_position)
         discarded_tile = PlacedTile(discarded_choice, tile_position)
-        turn_history = TurnHistory(
-            chosen_tile=chosen_tile,
-            discarded_tile=discarded_tile,
-            border_lines=border_lines if border_lines is not None else []
-        )
-        
-        # Update save state
-        new_save_state.choice_history.append(turn_history)
         
         # Handle border turn vs tile placement turn
         turn_index = save_state.current_turn - 1
         if TURN_ACTIONS[turn_index] == 'border':
-            # Border drawing turn
-            if border_lines:
+            # Border drawing turn - validate and process tile positions
+            if border_tiles:
+                # Validate the border tiles
+                if not self._validate_border_tiles(border_tiles):
+                    raise ValueError("Invalid border tiles: must be connected, enclosed, and have border length <= 24")
+                
+                # Convert tiles to border lines for storage
+                border_lines = self._tiles_to_border_lines(border_tiles)
+                
+                # Store previous island positions for comparison
+                prev_island_positions = set()
+                for island in save_state.islands:
+                    prev_island_positions.update(island.enclosed_positions)
+                
+                # Add new border lines to the state
                 new_save_state.border_lines.extend(border_lines)
-                # Detect new islands from the border lines
-                new_islands = self._detect_islands(border_lines)
-                new_save_state.islands.extend(new_islands)
+                
+                # Create island from the tile positions
+                is_lake = len(border_tiles) < 10  # Arbitrary threshold for now
+                new_island = Island(
+                    border_lines=border_lines,
+                    enclosed_positions=set(border_tiles),
+                    is_lake=is_lake
+                )
+                new_save_state.islands.append(new_island)
+                
+                # Update turn history with border lines
+                turn_history = TurnHistory(
+                    chosen_tile=chosen_tile,
+                    discarded_tile=discarded_tile,
+                    border_lines=border_lines
+                )
+            else:
+                # No border tiles provided
+                turn_history = TurnHistory(
+                    chosen_tile=chosen_tile,
+                    discarded_tile=discarded_tile,
+                    border_lines=[]
+                )
         else:
             # Tile placement turn
             new_save_state.placed_tiles.append(chosen_tile)
+            turn_history = TurnHistory(
+                chosen_tile=chosen_tile,
+                discarded_tile=discarded_tile,
+                border_lines=[]
+            )
         
+        # Update save state
+        new_save_state.choice_history.append(turn_history)
         new_save_state.current_turn += 1
         
         return new_save_state
@@ -676,23 +781,22 @@ if __name__ == "__main__":
                     save_state, 
                     chosen, 
                     discarded, 
-                    (turn % 9, (turn * 2) % 9)  # Vary positions
+                    (turn % 9, (turn * 2) % 9)  # Vary positions (x, y)
                 )
                 print(f"Placed {chosen.tile_type} tile at position ({turn % 9}, {(turn * 2) % 9})")
         else:
             # Border drawing turn
-            border_lines = [
-                BorderLine((0, 0), (8, 0), True),  # Top border
-                BorderLine((0, 0), (0, 8), False)  # Left border
+            border_tiles = [
+                (0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0), (1, 0)  # Valid enclosed area
             ]
             save_state = game_runner.make_turn(
                 save_state,
                 Choice("houses", "cluster", 1),  # Dummy choice for border turn
                 Choice("ships", "cluster", 2),   # Dummy choice for border turn
                 (0, 0),  # Dummy position
-                border_lines
+                border_tiles
             )
-            print(f"Drew {len(border_lines)} border lines")
+            print(f"Drew {len(border_tiles)} border tiles")
         
         print(f"Tiles placed: {summary['tiles_placed']}, Border lines: {summary['border_lines_drawn']}")
         print(f"Current points: {summary['current_points']}")

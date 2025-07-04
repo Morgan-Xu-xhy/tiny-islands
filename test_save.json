@@ -1,0 +1,476 @@
+{
+  "currentTurn": 12,
+  "choiceHistory": [
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "houses",
+          "chunkType": "cluster",
+          "chunkPosition": 1
+        },
+        "tilePosition": [
+          0,
+          0
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "ships",
+          "chunkType": "cluster",
+          "chunkPosition": 2
+        },
+        "tilePosition": [
+          0,
+          0
+        ]
+      },
+      "borderLines": [
+        {
+          "startPos": [
+            0,
+            0
+          ],
+          "endPos": [
+            8,
+            0
+          ],
+          "isHorizontal": true
+        },
+        {
+          "startPos": [
+            0,
+            0
+          ],
+          "endPos": [
+            0,
+            8
+          ],
+          "isHorizontal": false
+        }
+      ]
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "mountain",
+          "chunkType": "vertical",
+          "chunkPosition": 5
+        },
+        "tilePosition": [
+          2,
+          4
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "churches",
+          "chunkType": "horizontal",
+          "chunkPosition": 8
+        },
+        "tilePosition": [
+          2,
+          4
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "forest",
+          "chunkType": "horizontal",
+          "chunkPosition": 2
+        },
+        "tilePosition": [
+          3,
+          6
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "beach",
+          "chunkType": "cluster",
+          "chunkPosition": 4
+        },
+        "tilePosition": [
+          3,
+          6
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "mountain",
+          "chunkType": "cluster",
+          "chunkPosition": 3
+        },
+        "tilePosition": [
+          4,
+          8
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "beach",
+          "chunkType": "vertical",
+          "chunkPosition": 9
+        },
+        "tilePosition": [
+          4,
+          8
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "mountain",
+          "chunkType": "vertical",
+          "chunkPosition": 8
+        },
+        "tilePosition": [
+          5,
+          1
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "churches",
+          "chunkType": "horizontal",
+          "chunkPosition": 5
+        },
+        "tilePosition": [
+          5,
+          1
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "ships",
+          "chunkType": "horizontal",
+          "chunkPosition": 1
+        },
+        "tilePosition": [
+          6,
+          3
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "churches",
+          "chunkType": "vertical",
+          "chunkPosition": 9
+        },
+        "tilePosition": [
+          6,
+          3
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "ships",
+          "chunkType": "cluster",
+          "chunkPosition": 4
+        },
+        "tilePosition": [
+          7,
+          5
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "forest",
+          "chunkType": "cluster",
+          "chunkPosition": 5
+        },
+        "tilePosition": [
+          7,
+          5
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "waves",
+          "chunkType": "vertical",
+          "chunkPosition": 3
+        },
+        "tilePosition": [
+          8,
+          7
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "mountain",
+          "chunkType": "horizontal",
+          "chunkPosition": 3
+        },
+        "tilePosition": [
+          8,
+          7
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "churches",
+          "chunkType": "cluster",
+          "chunkPosition": 2
+        },
+        "tilePosition": [
+          0,
+          0
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "mountain",
+          "chunkType": "cluster",
+          "chunkPosition": 9
+        },
+        "tilePosition": [
+          0,
+          0
+        ]
+      },
+      "borderLines": []
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "houses",
+          "chunkType": "cluster",
+          "chunkPosition": 1
+        },
+        "tilePosition": [
+          0,
+          0
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "ships",
+          "chunkType": "cluster",
+          "chunkPosition": 2
+        },
+        "tilePosition": [
+          0,
+          0
+        ]
+      },
+      "borderLines": [
+        {
+          "startPos": [
+            0,
+            0
+          ],
+          "endPos": [
+            8,
+            0
+          ],
+          "isHorizontal": true
+        },
+        {
+          "startPos": [
+            0,
+            0
+          ],
+          "endPos": [
+            0,
+            8
+          ],
+          "isHorizontal": false
+        }
+      ]
+    },
+    {
+      "chosenChoice": {
+        "chosenChoice": {
+          "tileType": "ships",
+          "chunkType": "cluster",
+          "chunkPosition": 5
+        },
+        "tilePosition": [
+          2,
+          4
+        ]
+      },
+      "discardedChoice": {
+        "chosenChoice": {
+          "tileType": "beach",
+          "chunkType": "horizontal",
+          "chunkPosition": 7
+        },
+        "tilePosition": [
+          2,
+          4
+        ]
+      },
+      "borderLines": []
+    }
+  ],
+  "gameId": "game_20250701_204733",
+  "createdAt": "2025-07-01T20:47:33.972206",
+  "placedTiles": [
+    {
+      "chosenChoice": {
+        "tileType": "mountain",
+        "chunkType": "vertical",
+        "chunkPosition": 5
+      },
+      "tilePosition": [
+        2,
+        4
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "forest",
+        "chunkType": "horizontal",
+        "chunkPosition": 2
+      },
+      "tilePosition": [
+        3,
+        6
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "mountain",
+        "chunkType": "cluster",
+        "chunkPosition": 3
+      },
+      "tilePosition": [
+        4,
+        8
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "mountain",
+        "chunkType": "vertical",
+        "chunkPosition": 8
+      },
+      "tilePosition": [
+        5,
+        1
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "ships",
+        "chunkType": "horizontal",
+        "chunkPosition": 1
+      },
+      "tilePosition": [
+        6,
+        3
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "ships",
+        "chunkType": "cluster",
+        "chunkPosition": 4
+      },
+      "tilePosition": [
+        7,
+        5
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "waves",
+        "chunkType": "vertical",
+        "chunkPosition": 3
+      },
+      "tilePosition": [
+        8,
+        7
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "churches",
+        "chunkType": "cluster",
+        "chunkPosition": 2
+      },
+      "tilePosition": [
+        0,
+        0
+      ]
+    },
+    {
+      "chosenChoice": {
+        "tileType": "ships",
+        "chunkType": "cluster",
+        "chunkPosition": 5
+      },
+      "tilePosition": [
+        2,
+        4
+      ]
+    }
+  ],
+  "borderLines": [
+    {
+      "startPos": [
+        0,
+        0
+      ],
+      "endPos": [
+        8,
+        0
+      ],
+      "isHorizontal": true
+    },
+    {
+      "startPos": [
+        0,
+        0
+      ],
+      "endPos": [
+        0,
+        8
+      ],
+      "isHorizontal": false
+    },
+    {
+      "startPos": [
+        0,
+        0
+      ],
+      "endPos": [
+        8,
+        0
+      ],
+      "isHorizontal": true
+    },
+    {
+      "startPos": [
+        0,
+        0
+      ],
+      "endPos": [
+        0,
+        8
+      ],
+      "isHorizontal": false
+    }
+  ],
+  "islands": []
+}
