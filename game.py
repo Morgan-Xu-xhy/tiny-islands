@@ -250,11 +250,19 @@ class GameRunner:
             return 0  # Don't calculate points until game is over
         
         points = 0
-        print("\n--- Final Tile Scoring Breakdown ---")
-        for tile in save_state.placed_tiles:
-            tile_points = self._calculate_tile_points(tile, save_state)
-            print(f"Tile {tile.choice.tile_type} at {tile.tile_position}: {tile_points} points")
-            points += tile_points
+        
+        # Only print breakdown once when game ends
+        if save_state.current_turn == len(TURN_ACTIONS) + 1:  # Turn 31
+            print("\n--- Final Tile Scoring Breakdown ---")
+            for tile in save_state.placed_tiles:
+                tile_points = self._calculate_tile_points(tile, save_state)
+                print(f"Tile {tile.choice.tile_type} at {tile.tile_position}: {tile_points} points")
+                points += tile_points
+        else:
+            # Calculate points without printing
+            for tile in save_state.placed_tiles:
+                tile_points = self._calculate_tile_points(tile, save_state)
+                points += tile_points
         
         # Calculate penalty for features in wrong locations (sea vs island)
         points -= self._calculate_location_penalties(save_state)
@@ -329,13 +337,38 @@ class GameRunner:
     
     def _calculate_ship_points(self, position: Tuple[int, int], save_state: SaveState) -> int:
         """Ships like to be far from islands and other boats (1pt per square separation)"""
+        # If ship is on an island, it scores 0 points
+        if self._is_on_island(position, save_state):
+            return 0
+            
         min_distance = float('inf')
         
         # Find minimum distance to any other ship or island
         for tile in save_state.placed_tiles:
-            if tile.choice.tile_type == "ships" or self._is_on_island(tile.tile_position, save_state):
+            # Skip the ship itself
+            if tile.tile_position == position:
+                continue
+                
+            is_on_island = self._is_on_island(tile.tile_position, save_state)
+            
+            if tile.choice.tile_type == "ships" or is_on_island:
                 distance = abs(position[0] - tile.tile_position[0]) + abs(position[1] - tile.tile_position[1])
                 min_distance = min(min_distance, distance)
+        
+        # Also check all empty tiles on islands
+        for y in range(GRID_SIZE):
+            for x in range(GRID_SIZE):
+                empty_pos = (x, y)
+                # Skip if this is the ship's position
+                if empty_pos == position:
+                    continue
+                # Skip if there's already a tile here (we checked placed tiles above)
+                if any(tile.tile_position == empty_pos for tile in save_state.placed_tiles):
+                    continue
+                # Check if this empty position is on an island
+                if self._is_on_island(empty_pos, save_state):
+                    distance = abs(position[0] - empty_pos[0]) + abs(position[1] - empty_pos[1])
+                    min_distance = min(min_distance, distance)
         
         return int(min_distance) if min_distance != float('inf') else 0
     
@@ -500,17 +533,58 @@ class GameRunner:
         tile_types = [tile.value for tile in TileType]
         chunk_types = [chunk.value for chunk in ChunkType]
         
-        # Generate exactly 2 random choices
-        for _ in range(2):
-            tile_type = random.choice(tile_types)
-            chunk_type = random.choice(chunk_types)
-            chunk_position = random.randint(1, 9)  # Random position within chunk
+        # Generate first choice
+        tile_type1 = random.choice(tile_types)
+        chunk_type1 = random.choice(chunk_types)
+        chunk_position1 = random.randint(1, 9)
+        
+        first_choice = Choice(
+            tile_type=tile_type1,
+            chunk_type=chunk_type1,
+            chunk_position=chunk_position1
+        )
+        choices.append(first_choice)
+        
+        # Generate second choice, ensuring it's different from the first
+        max_attempts = 100  # Prevent infinite loop
+        attempts = 0
+        
+        while attempts < max_attempts:
+            tile_type2 = random.choice(tile_types)
+            chunk_type2 = random.choice(chunk_types)
+            chunk_position2 = random.randint(1, 9)
             
-            choices.append(Choice(
-                tile_type=tile_type,
-                chunk_type=chunk_type,
-                chunk_position=chunk_position
-            ))
+            second_choice = Choice(
+                tile_type=tile_type2,
+                chunk_type=chunk_type2,
+                chunk_position=chunk_position2
+            )
+            
+            # Check if choices are different
+            if (second_choice.tile_type != first_choice.tile_type or
+                second_choice.chunk_position != first_choice.chunk_position):
+                choices.append(second_choice)
+                break
+            
+            attempts += 1
+        
+        # If we couldn't find a different choice after max attempts, just use the first one
+        # This should be extremely rare given the number of possible combinations
+        if len(choices) == 1:
+            # Force a different choice by changing at least one property
+            if first_choice.chunk_position < 9:
+                second_choice = Choice(
+                    tile_type=first_choice.tile_type,
+                    chunk_type=first_choice.chunk_type,
+                    chunk_position=first_choice.chunk_position + 1
+                )
+            else:
+                second_choice = Choice(
+                    tile_type=first_choice.tile_type,
+                    chunk_type=first_choice.chunk_type,
+                    chunk_position=first_choice.chunk_position - 1
+                )
+            choices.append(second_choice)
         
         return choices
     
