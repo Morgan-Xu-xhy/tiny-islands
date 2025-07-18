@@ -79,6 +79,7 @@ class GameUI:
         self.font_small = pygame.font.Font(None, 24)
         
         self.colored_island_tiles = set()  # Stores all tiles that have ever been part of an island
+        self.final_score_printed = False   # Flag to ensure final score breakdown is printed only once
     
     def load_tile_icons(self):
         """Load and resize tile icons"""
@@ -269,6 +270,21 @@ class GameUI:
     
     def draw_grid(self):
         """Draw the main game grid"""
+        # Draw column indices (0-8) above the grid
+        for col in range(GRID_SIZE):
+            screen_x = GRID_OFFSET_X + col * GRID_CELL_SIZE + GRID_CELL_SIZE // 2
+            screen_y = GRID_OFFSET_Y - 20  # Above the grid
+            col_text = self.font_small.render(str(col), True, BLACK)
+            col_rect = col_text.get_rect(center=(screen_x, screen_y))
+            self.screen.blit(col_text, col_rect)
+        # Draw row indices (0-8) to the left of the grid
+        for row in range(GRID_SIZE):
+            screen_x = GRID_OFFSET_X - 20  # Left of the grid
+            screen_y = GRID_OFFSET_Y + row * GRID_CELL_SIZE + GRID_CELL_SIZE // 2
+            row_text = self.font_small.render(str(row), True, BLACK)
+            row_rect = row_text.get_rect(center=(screen_x, screen_y))
+            self.screen.blit(row_text, row_rect)
+        
         # Draw permanent island backgrounds with the new color #c9c6af
         ISLAND_PERMA_COLOR = (201, 198, 175)  # #c9c6af in RGB
         for (x, y) in self.colored_island_tiles:  # x is column, y is row
@@ -282,28 +298,29 @@ class GameUI:
                 screen_x = GRID_OFFSET_X + x * GRID_CELL_SIZE
                 screen_y = GRID_OFFSET_Y + y * GRID_CELL_SIZE
                 
-                # Determine cell color (only for non-island tiles)
-                color = WHITE
+                # Determine cell color
+                color = None
                 tile = self.get_tile_at_position((x, y))  # (x, y) where x is column, y is row
                 
-                # Only apply cell background color if this tile is not part of an island
-                if (x, y) not in self.colored_island_tiles:
-                    if tile:
-                        color = LIGHT_BLUE
-                    elif self.selected_choice:
-                        valid_positions = self.get_chunk_positions(self.selected_choice)
-                        if (x, y) in valid_positions:
-                            if self.hover_choice:
-                                color = YELLOW  # Hover highlight
-                            else:
-                                color = LIGHT_GREEN  # Valid position
-                    elif self.hover_choice:
-                        # Show chunk preview for hovered choice
-                        hover_positions = self.get_chunk_positions(self.hover_choice)
-                        if (x, y) in hover_positions:
-                            color = YELLOW  # Hover preview
-                    
-                    # Draw cell background only for non-island tiles
+                # Check for preview colors (these should override island colors)
+                if self.selected_choice:
+                    valid_positions = self.get_chunk_positions(self.selected_choice)
+                    if (x, y) in valid_positions:
+                        if self.hover_choice:
+                            color = YELLOW  # Hover highlight
+                        else:
+                            color = LIGHT_GREEN  # Valid position
+                elif self.hover_choice:
+                    # Show chunk preview for hovered choice
+                    hover_positions = self.get_chunk_positions(self.hover_choice)
+                    if (x, y) in hover_positions:
+                        color = YELLOW  # Hover preview
+                elif tile and (x, y) not in self.colored_island_tiles:
+                    # Only show LIGHT_BLUE for placed tiles that are not on islands
+                    color = LIGHT_BLUE
+                
+                # Draw cell background if we have a color to draw
+                if color:
                     pygame.draw.rect(self.screen, color, (screen_x, screen_y, GRID_CELL_SIZE, GRID_CELL_SIZE))
                 
                 # Draw cell border for all tiles
@@ -550,6 +567,14 @@ class GameUI:
             complete_text = self.font_small.render("Draw enclosed areas to complete", True, BLACK)
             self.screen.blit(complete_text, (30, 190))
     
+    def does_new_line_touch_existing(self, start, end):
+        """Return True if the new line (start, end) touches any existing border line from previous turns."""
+        for line in self.save_state.border_lines:
+            # If the new line shares a vertex with any existing line, it's touching
+            if start == line.start_pos or start == line.end_pos or end == line.start_pos or end == line.end_pos:
+                return True
+        return False
+
     def handle_events(self):
         """Handle pygame events"""
         for event in pygame.event.get():
@@ -584,8 +609,13 @@ class GameUI:
                                 # Only allow horizontal or vertical moves
                                 if (vertex_pos[0] == last_vertex[0] or vertex_pos[1] == last_vertex[1]) and \
                                    (abs(vertex_pos[0] - last_vertex[0]) <= 1 and abs(vertex_pos[1] - last_vertex[1]) <= 1):
+                                    # Check if new line would touch any existing border line
+                                    if self.does_new_line_touch_existing(last_vertex, vertex_pos):
+                                        print("Cannot draw: border line would touch an existing border line from a previous island.")
+                                        self.border_drag_active = False
+                                        self.border_drag_path = []
                                     # Check if we're revisiting a vertex (for closing or undoing)
-                                    if vertex_pos in self.border_drag_path:
+                                    elif vertex_pos in self.border_drag_path:
                                         # Find the index of the revisited vertex
                                         revisit_index = self.border_drag_path.index(vertex_pos)
                                         # If we're revisiting the start vertex, close the border
@@ -770,6 +800,16 @@ class GameUI:
             island_positions.update(island.enclosed_positions)
         return island_positions
     
+    def print_final_score_breakdown(self):
+        print("\n--- Final Tile Scoring Breakdown ---")
+        for tile in self.save_state.placed_tiles:
+            tile_points = self.game_runner._calculate_tile_points(tile, self.save_state)
+            print(f"Tile {tile.choice.tile_type} at {tile.tile_position}: {tile_points} points")
+        penalty = self.game_runner._calculate_location_penalties(self.save_state)
+        if penalty:
+            print(f"Penalty for features in wrong locations: -{penalty} points")
+        print(f"Final Score: {self.game_runner.calculate_points(self.save_state)}")
+    
     def run(self):
         """Main game loop"""
         running = True
@@ -782,6 +822,12 @@ class GameUI:
                 self.draw_grid()
                 self.draw_choice_panel()
                 self.draw_status_panel()
+                
+                # Print final score breakdown only once when game ends
+                summary = self.game_runner.get_game_summary(self.save_state)
+                if summary['game_ended'] and not self.final_score_printed:
+                    self.print_final_score_breakdown()
+                    self.final_score_printed = True
                 
                 pygame.display.flip()
                 self.clock.tick(60)

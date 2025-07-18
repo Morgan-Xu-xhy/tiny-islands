@@ -248,25 +248,12 @@ class GameRunner:
         """Calculate points given a save state (SaveState -> integer)"""
         if not self.decide_end(save_state):
             return 0  # Don't calculate points until game is over
-        
         points = 0
-        
-        # Only print breakdown once when game ends
-        if save_state.current_turn == len(TURN_ACTIONS) + 1:  # Turn 31
-            print("\n--- Final Tile Scoring Breakdown ---")
-            for tile in save_state.placed_tiles:
-                tile_points = self._calculate_tile_points(tile, save_state)
-                print(f"Tile {tile.choice.tile_type} at {tile.tile_position}: {tile_points} points")
-                points += tile_points
-        else:
-            # Calculate points without printing
-            for tile in save_state.placed_tiles:
-                tile_points = self._calculate_tile_points(tile, save_state)
-                points += tile_points
-        
+        for tile in save_state.placed_tiles:
+            tile_points = self._calculate_tile_points(tile, save_state)
+            points += tile_points
         # Calculate penalty for features in wrong locations (sea vs island)
         points -= self._calculate_location_penalties(save_state)
-        
         return points
     
     def _calculate_tile_points(self, placed_tile: PlacedTile, save_state: SaveState) -> int:
@@ -445,9 +432,27 @@ class GameRunner:
         return points
     
     def _calculate_forest_points(self, position: Tuple[int, int], save_state: SaveState) -> int:
-        """Forest likes to touch other forest (2pts per forest in group minus 2pts)"""
+        """Forest likes to touch other forest - group scoring: (n-1)*2 points for group of n forests"""
+        # Get the forest group this forest belongs to
         forest_group = self._get_forest_group(position, save_state)
-        return 2 * len(forest_group) - 2
+        
+        # If this is a single forest (not connected to others), score 0
+        if len(forest_group) <= 1:
+            return 0
+        
+        # Calculate total points for the group: (n-1) * 2
+        total_group_points = (len(forest_group) - 1) * 2
+        
+        # Distribute points equally among all forests in the group
+        base_points_per_forest = total_group_points // len(forest_group)
+        remainder = total_group_points % len(forest_group)
+        
+        # Add extra point for the first 'remainder' forests to distribute leftover points
+        forest_index = sorted(forest_group).index(position)
+        if forest_index < remainder:
+            return base_points_per_forest + 1
+        else:
+            return base_points_per_forest
     
     def _calculate_mountain_points(self, position: Tuple[int, int], save_state: SaveState) -> int:
         """Mountain likes to be near forest (2pts per forest nearby)"""
