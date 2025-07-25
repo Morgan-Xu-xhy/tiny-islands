@@ -5,6 +5,7 @@ import json
 import copy
 from datetime import datetime
 import random
+from collections import Counter
 
 
 class TileType(Enum):
@@ -143,7 +144,7 @@ GRID_SIZE = 9
 TURN_ACTIONS = [
     'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'border',
     'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'border',
-    'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'border'
+    'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'choice', 'border'
 ]
 
 @dataclass
@@ -199,9 +200,17 @@ class GameRunner:
     def __init__(self):
         self.grid_size = GRID_SIZE
         self.max_border_lines = MAX_BORDER_LINES
+        self.generated_tile_types_debug = []  # For debugging: track all generated tile types
+        self.tile_type_list_printed = False   # Ensure print only once
+        self.tile_type_pool = []  # Pool for bounded random tile types
+        self.tile_type_pool_index = 0  # Track position in pool
     
     def create_new_game(self) -> SaveState:
-        """Create a new game save state"""
+        """Create a new game save state and generate a new tile type pool"""
+        self.tile_type_pool = self.generate_bounded_tile_pool()
+        self.tile_type_pool_index = 0
+        self.generated_tile_types_debug = []
+        self.tile_type_list_printed = False
         return SaveState(
             current_turn=1,
             choice_history=[],
@@ -530,51 +539,62 @@ class GameRunner:
     
 
     
+    def generate_bounded_tile_pool(self):
+        TILE_TYPES = ['beach', 'churches', 'forest', 'houses', 'mountain', 'ships', 'waves']
+        MIN_COUNTS = [8, 4, 11, 8, 3, 3, 8]
+        MAX_COUNTS = [9, 6, 13, 11, 5, 3, 10]
+        TOTAL = 52
+        counts = MIN_COUNTS[:]
+        remaining = TOTAL - sum(counts)
+        indices = list(range(len(TILE_TYPES)))
+        while remaining > 0:
+            random.shuffle(indices)
+            for i in indices:
+                if counts[i] < MAX_COUNTS[i]:
+                    counts[i] += 1
+                    remaining -= 1
+                    if remaining == 0:
+                        break
+        pool = []
+        for tile, count in zip(TILE_TYPES, counts):
+            pool.extend([tile] * count)
+        random.shuffle(pool)
+        return pool
+    
     def generate_choice(self) -> List[Choice]:
-        """Generate exactly 2 random choices for the current turn"""
+        """Generate exactly 2 random choices for the current turn, using the bounded tile type pool."""
         choices = []
-        
-        # Generate random tile types and chunk types
-        tile_types = [tile.value for tile in TileType]
         chunk_types = [chunk.value for chunk in ChunkType]
-        
-        # Generate first choice
-        tile_type1 = random.choice(tile_types)
+        max_attempts = 100
+        attempts = 0
+        # Draw tile types from the pool
+        if self.tile_type_pool_index + 2 > len(self.tile_type_pool):
+            raise ValueError("Not enough tile types left in the pool for this game!")
+        tile_type1 = self.tile_type_pool[self.tile_type_pool_index]
+        tile_type2 = self.tile_type_pool[self.tile_type_pool_index + 1]
+        self.tile_type_pool_index += 2
         chunk_type1 = random.choice(chunk_types)
         chunk_position1 = random.randint(1, 9)
-        
         first_choice = Choice(
             tile_type=tile_type1,
             chunk_type=chunk_type1,
             chunk_position=chunk_position1
         )
         choices.append(first_choice)
-        
-        # Generate second choice, ensuring it's different from the first
-        max_attempts = 100  # Prevent infinite loop
-        attempts = 0
-        
+        # Ensure the second choice is different in tile type or chunk position
         while attempts < max_attempts:
-            tile_type2 = random.choice(tile_types)
             chunk_type2 = random.choice(chunk_types)
             chunk_position2 = random.randint(1, 9)
-            
             second_choice = Choice(
                 tile_type=tile_type2,
                 chunk_type=chunk_type2,
                 chunk_position=chunk_position2
             )
-            
-            # Check if choices are different
             if (second_choice.tile_type != first_choice.tile_type or
                 second_choice.chunk_position != first_choice.chunk_position):
                 choices.append(second_choice)
                 break
-            
             attempts += 1
-        
-        # If we couldn't find a different choice after max attempts, just use the first one
-        # This should be extremely rare given the number of possible combinations
         if len(choices) == 1:
             # Force a different choice by changing at least one property
             if first_choice.chunk_position < 9:
@@ -590,7 +610,9 @@ class GameRunner:
                     chunk_position=first_choice.chunk_position - 1
                 )
             choices.append(second_choice)
-        
+        # Debug: track generated tile types
+        self.generated_tile_types_debug.append(first_choice.tile_type)
+        self.generated_tile_types_debug.append(choices[1].tile_type)
         return choices
     
     def _validate_border_tiles(self, tile_positions: List[Tuple[int, int]]) -> bool:
@@ -813,7 +835,7 @@ class GameRunner:
         turn_index = save_state.current_turn - 1
         phase = TURN_ACTIONS[turn_index] if turn_index < len(TURN_ACTIONS) else 'ended'
         cycle = (save_state.current_turn - 1) // 10 + 1 if save_state.current_turn <= len(TURN_ACTIONS) else 3
-        return {
+        summary = {
             "game_id": save_state.game_id,
             "current_turn": save_state.current_turn,
             "total_turns": len(TURN_ACTIONS),
@@ -828,6 +850,12 @@ class GameRunner:
             "cycle": cycle,
             "turns_in_cycle": (save_state.current_turn - 1) % 10 + 1 if save_state.current_turn <= len(TURN_ACTIONS) else 10
         }
+        # Debug: print tile type list at end of game
+        if summary['game_ended'] and not self.tile_type_list_printed:
+            print("\n[DEBUG] Tile types for all choices this game:")
+            print(self.generated_tile_types_debug)
+            self.tile_type_list_printed = True
+        return summary
 
 
 # Example usage and testing
